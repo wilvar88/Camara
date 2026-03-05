@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cámara Mágica | Vale 31</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700&family=Pacifico&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --accent: #f59e0b;
+            --bg: #0f172a;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background: var(--bg);
+            color: #fff;
+            font-family: 'Outfit', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        header {
+            padding: 20px;
+            text-align: center;
+            width: 100%;
+        }
+
+        h1 {
+            font-family: 'Pacifico', cursive;
+            color: var(--accent);
+            margin: 0;
+            font-size: 2rem;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 400px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            padding-bottom: 40px;
+        }
+
+        select,
+        .btn {
+            width: 100%;
+            padding: 15px;
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.05);
+            color: #fff;
+            font-size: 1rem;
+            outline: none;
+        }
+
+        .btn {
+            background: var(--accent);
+            color: #000;
+            font-weight: 700;
+            border: none;
+            cursor: pointer;
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+
+        #camera-box {
+            width: 100%;
+            aspect-ratio: 3/4;
+            background: #000;
+            border-radius: 20px;
+            border: 2px solid var(--accent);
+            overflow: hidden;
+            position: relative;
+        }
+
+        video,
+        canvas {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        #preview {
+            display: none;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Mockup Overlay */
+        .mockup-overlay {
+            position: absolute;
+            inset: 0;
+            background: url('../principal/assets/mockup.png') center/cover no-repeat;
+            pointer-events: none;
+            opacity: 0.7;
+            z-index: 5;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>Cámara Mágica</h1>
+        <p style="opacity:0.6; font-size:0.8rem;">Tómate una foto para Vale</p>
+    </header>
+
+    <div class="container">
+        <!-- Step 1: Identity -->
+        <div id="step-name">
+            <p>¿Quién aparece en la foto?</p>
+            <input type="text" id="guest-name" placeholder="Escribe tu nombre aquí..." class="btn"
+                style="background: rgba(255, 255, 255, 0.05); color: #fff; text-align: left; margin-bottom: 20px;">
+            <button class="btn" onclick="startCamera()">¡Listo para la foto! 📸</button>
+        </div>
+
+        <!-- Step 2: Camera -->
+        <div id="step-camera" class="hidden">
+            <div id="camera-box">
+                <div class="mockup-overlay"></div>
+                <video id="video" autoplay playsinline></video>
+                <canvas id="canvas" class="hidden"></canvas>
+            </div>
+
+            <div id="camera-controls">
+                <button class="btn" onclick="takePhoto()">Capturar Momento ✨</button>
+            </div>
+
+            <div id="preview-controls" class="hidden">
+                <div class="controls">
+                    <button class="btn btn-secondary" style="flex:1;" onclick="retake()">Borrar</button>
+                    <button class="btn" style="flex:2;" onclick="savePhoto()">Guardar Foto ❤️</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let stream;
+        let selectedGuest = "";
+
+        // Fill Guest List
+        async function loadGuests() {
+            try {
+                const res = await fetch('/api/nfc/test'); // We contextually know guestData exists in server
+                // BUT better: let's fetch messages or a dedicated endpoint. 
+                // For now, let's assume the user has the Google Sheet linked.
+                // Re-using the guest list logic:
+                const response = await fetch('/api/photos'); // Just to check connectivity
+                // Actually, let's just make a simple text input if we can't easily fetch the list
+                // OR better, try to fetch the list from the server if we add an endpoint.
+            } catch (e) { }
+        }
+
+        async function startCamera() {
+            selectedGuest = document.getElementById('guest-name').value;
+            if (!selectedGuest) {
+                alert("Por favor, ingresa tu nombre para continuar.");
+                return;
+            }
+
+            document.getElementById('step-name').classList.add('hidden');
+            document.getElementById('step-camera').classList.remove('hidden');
+
+            try {
+                if (!window.isSecureContext || !navigator.mediaDevices) {
+                    throw new Error("Este sitio no es seguro (HTTP). La cámara requiere HTTPS o una conexión segura para funcionar.");
+                }
+
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: "user" },
+                    audio: false
+                });
+                document.getElementById('video').srcObject = stream;
+            } catch (err) {
+                alert("🚫 Error de Cámara: " + err.message);
+                console.error(err);
+            }
+        }
+
+        function takePhoto() {
+            const video = document.getElementById('video');
+            const canvas = document.getElementById('canvas');
+            const context = canvas.getContext('2d');
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0);
+
+            video.classList.add('hidden');
+            canvas.classList.remove('hidden');
+            document.getElementById('camera-controls').classList.add('hidden');
+            document.getElementById('preview-controls').classList.remove('hidden');
+        }
+
+        function retake() {
+            document.getElementById('video').classList.remove('hidden');
+            document.getElementById('canvas').classList.add('hidden');
+            document.getElementById('camera-controls').classList.remove('hidden');
+            document.getElementById('preview-controls').classList.add('hidden');
+        }
+
+        async function savePhoto() {
+            const btn = document.querySelector('#preview-controls .btn:last-child');
+            const originalText = btn.textContent;
+
+            const canvas = document.getElementById('canvas');
+            // Use JPEG at 0.8 quality to reduce payload size significantly
+            const photoData = canvas.toDataURL('image/jpeg', 0.8);
+
+            try {
+                btn.disabled = true;
+                btn.textContent = "⏳ Guardando...";
+
+                const res = await fetch('/api/photos/upload', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: selectedGuest, photo: photoData })
+                });
+
+                if (!res.ok) throw new Error("Error en la respuesta del servidor");
+
+                const result = await res.json();
+                if (result.success) {
+                    alert("¡Foto guardada con éxito! 🎉 La verás pronto en la galería.");
+                    // Reset UI
+                    document.getElementById('step-camera').classList.add('hidden');
+                    document.getElementById('step-name').classList.remove('hidden');
+                    document.getElementById('guest-name').value = "";
+                    retake();
+                } else {
+                    alert("Error al guardar: " + (result.error || "Desconocido"));
+                }
+            } catch (err) {
+                alert("🚫 Error de conexión: " + err.message);
+                console.error(err);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
+        }
+    </script>
+</body>
+
+</html>
