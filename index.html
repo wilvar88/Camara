@@ -103,11 +103,12 @@
             display: none !important;
         }
 
-        /* Mockup Overlay */
         .mockup-overlay {
             position: absolute;
             inset: 0;
-            background: url('../principal/assets/mockup.png') center/cover no-repeat;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
             pointer-events: none;
             opacity: 0.7;
             z-index: 5;
@@ -122,7 +123,6 @@
     </header>
 
     <div class="container">
-        <!-- Step 1: Identity -->
         <div id="step-name">
             <p>¿Quién aparece en la foto?</p>
             <input type="text" id="guest-name" placeholder="Escribe tu nombre aquí..." class="btn"
@@ -130,7 +130,6 @@
             <button class="btn" onclick="startCamera()">¡Listo para la foto! 📸</button>
         </div>
 
-        <!-- Step 2: Camera -->
         <div id="step-camera" class="hidden">
             <div id="camera-box">
                 <div class="mockup-overlay"></div>
@@ -155,18 +154,23 @@
         let stream;
         let selectedGuest = "";
 
-        // Fill Guest List
-        async function loadGuests() {
-            try {
-                const res = await fetch('/api/nfc/test'); // We contextually know guestData exists in server
-                // BUT better: let's fetch messages or a dedicated endpoint. 
-                // For now, let's assume the user has the Google Sheet linked.
-                // Re-using the guest list logic:
-                const response = await fetch('/api/photos'); // Just to check connectivity
-                // Actually, let's just make a simple text input if we can't easily fetch the list
-                // OR better, try to fetch the list from the server if we add an endpoint.
-            } catch (e) { }
-        }
+        // DETECT SERVER URL (for GitHub Pages hosting)
+        const urlParams = new URLSearchParams(window.location.search);
+        let serverUrl = urlParams.get('server') || window.location.origin;
+        if (serverUrl.endsWith('/')) serverUrl = serverUrl.slice(0, -1);
+
+        console.log("Using Backend Server:", serverUrl);
+
+        // Map Mockup Image with Absolute Path
+        document.addEventListener('DOMContentLoaded', () => {
+            const overlay = document.querySelector('.mockup-overlay');
+            if (overlay) {
+                overlay.style.backgroundImage = `url('${serverUrl}/principal/assets/Mockup.png')`;
+            }
+        });
+
+        // Fill Guest List (Placeholder if needed)
+        async function loadGuests() { }
 
         async function startCamera() {
             selectedGuest = document.getElementById('guest-name').value;
@@ -228,7 +232,7 @@
                 btn.disabled = true;
                 btn.textContent = "⏳ Guardando...";
 
-                const res = await fetch('/api/photos/upload', {
+                const res = await fetch(`${serverUrl}/api/photos/upload`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ name: selectedGuest, photo: photoData })
