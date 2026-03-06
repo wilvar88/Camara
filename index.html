@@ -203,6 +203,7 @@
             const canvas = document.getElementById('canvas');
             const context = canvas.getContext('2d');
 
+            // Restoration: High Resolution (No more 800px limit for tunnel)
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             context.drawImage(video, 0, 0);
@@ -225,35 +226,56 @@
             const originalText = btn.textContent;
 
             const canvas = document.getElementById('canvas');
-            // Use JPEG at 0.8 quality to reduce payload size significantly
-            const photoData = canvas.toDataURL('image/jpeg', 0.8);
+            // High Resolution: 0.9 Quality (Cloud can handle it)
+            const photoData = canvas.toDataURL('image/jpeg', 0.9);
+
+            // NOTE: User needs a free API KEY from imgbb.com
+            const IMGBB_KEY = "eb0656a61699a9c5d5b03c1daecbdf95";
 
             try {
                 btn.disabled = true;
-                btn.textContent = "⏳ Guardando...";
+                btn.textContent = "☁️ Subiendo...";
 
+                // 1. Upload to Cloud (ImgBB)
+                const formData = new FormData();
+                formData.append("image", photoData.split(',')[1]);
+
+                const cloudRes = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_KEY}`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!cloudRes.ok) throw new Error("Fallo al subir a la nube (ImgBB)");
+                const cloudData = await cloudRes.json();
+                const cloudUrl = cloudData.data.url;
+
+                // 2. Notify Local Server (Tiny payload)
+                btn.textContent = "📡 Registrando...";
                 const res = await fetch(`${serverUrl}/api/photos/upload`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: selectedGuest, photo: photoData })
+                    mode: 'cors',
+                    body: JSON.stringify({
+                        name: selectedGuest,
+                        photoUrl: cloudUrl // ONLY LINK!
+                    })
                 });
 
-                if (!res.ok) throw new Error("Error en la respuesta del servidor");
+                if (!res.ok) throw new Error("Servidor no recibió el link");
 
                 const result = await res.json();
                 if (result.success) {
-                    alert("¡Foto guardada con éxito! 🎉 La verás pronto en la galería.");
-                    // Reset UI
+                    alert("¡Foto HD guardada! 🎉 Volviendo...");
                     document.getElementById('step-camera').classList.add('hidden');
                     document.getElementById('step-name').classList.remove('hidden');
                     document.getElementById('guest-name').value = "";
                     retake();
                 } else {
-                    alert("Error al guardar: " + (result.error || "Desconocido"));
+                    alert("❌ Error: " + (result.error || "Desconocido"));
                 }
             } catch (err) {
-                alert("🚫 Error de conexión: " + err.message);
-                console.error(err);
+                console.error("SAVE ERROR:", err);
+                alert("🚫 Error: " + err.message + "\n\nVerifica internet y el Túnel.");
             } finally {
                 btn.disabled = false;
                 btn.textContent = originalText;
